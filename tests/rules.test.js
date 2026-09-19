@@ -188,6 +188,62 @@ test('a spawned sector always has travel left before reaching the marker', () =>
   }
 });
 
+test('freeIntervals merges overlapping and wrapping blocked runs', () => {
+  /* Padding sectors by a minimum gap makes neighbouring blocked intervals
+   * overlap. Treating them as disjoint invents free space across a sector. */
+  const overlapping = [{ start: 0, span: 2 }, { start: 1, span: 2 }];
+  const free = G.freeIntervals(overlapping);
+  assert.strictEqual(free.length, 1, 'expected one free run');
+  assert.ok(Math.abs(free[0].start - 3) < 1e-6, 'free run starts at the merged end');
+  assert.ok(Math.abs(free[0].span - (TAU - 3)) < 1e-6, 'free run covers the rest');
+
+  /* Nothing reported as free may overlap anything reported as blocked. */
+  const blocked = [{ start: 6.0, span: 1.5 }, { start: 0.5, span: 1.0 }, { start: 1.2, span: 1.0 }];
+  G.freeIntervals(blocked).forEach(f => {
+    blocked.forEach(b => {
+      assert.ok(!G.arcsOverlap(f.start, f.span, G.norm(b.start), b.span),
+        'a free run overlapped a blocked run');
+    });
+  });
+
+  /* Fully blocked leaves nothing. */
+  assert.strictEqual(G.freeIntervals([{ start: 0, span: TAU }]).length, 0);
+});
+
+test('sectors never come closer than the minimum gap during a live run', () => {
+  const config = freshConfig();
+  const minGap = G.degToRad(config.rules.minGapDeg);
+  let worst = Infinity;
+  let violations = 0;
+  let overlaps = 0;
+
+  for (let seed = 1; seed <= 12; seed++) {
+    const game = startPlaying(newGame({}, seed), seed);
+    while (game.state === 'playing' && game.lastNowCursor < 25000) {
+      run(game, 16);
+      if (game.ring.hitTest(game.ringAngle)) {
+        game.lastPressAt = -Infinity;
+        game.press(game.lastNowCursor);
+      }
+      const visible = game.ring.sectors.filter(s => s.phase !== 'out');
+      for (const a of visible) {
+        for (const b of visible) {
+          if (a === b) continue;
+          const A = G.norm(game.ringAngle + a.start);
+          const B = G.norm(game.ringAngle + b.start);
+          if (G.arcsOverlap(A, a.span, B, b.span)) overlaps++;
+          const gap = G.cwDelta(G.norm(A + a.span), B);
+          if (gap < worst) worst = gap;
+          if (gap < minGap - 1e-6) violations++;
+        }
+      }
+    }
+  }
+  assert.strictEqual(overlaps, 0, 'sectors overlapped');
+  assert.strictEqual(violations, 0,
+    violations + ' gaps below the minimum; smallest was ' + G.radToDeg(worst).toFixed(1) + ' deg');
+});
+
 test('a sector is not judgeable while it is fading in or out', () => {
   const game = startPlaying(newGame());
   const ring = game.ring;

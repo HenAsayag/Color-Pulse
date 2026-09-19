@@ -65,24 +65,61 @@
   }
 
   /* Free intervals on the circle once `blocked` ({start, span}) is removed.
-   * Returns a list of {start, span} in design angles, largest-first order is
-   * NOT guaranteed; callers weight by span themselves. */
+   * Returns a list of {start, span} in design angles; order is not meaningful,
+   * callers weight by span themselves.
+   *
+   * The blocked intervals may OVERLAP and may wrap past 0 — which is exactly
+   * what happens when sectors are padded by a minimum gap on both sides — so
+   * they have to be merged before the complement is taken. Treating them as
+   * disjoint produces phantom free space spanning other sectors.
+   */
   function freeIntervals(blocked) {
-    if (!blocked.length) return [{ start: 0, span: TAU }];
-    var items = blocked.map(function (b) { return { start: norm(b.start), span: Math.min(b.span, TAU) }; });
-    items.sort(function (a, b) { return a.start - b.start; });
+    var EPS = 1e-9;
 
-    var gaps = [];
-    for (var i = 0; i < items.length; i++) {
-      var current = items[i];
-      var next = items[(i + 1) % items.length];
-      var end = current.start + current.span;
-      var span = cwDelta(norm(end), next.start);
-      /* When only one item exists the gap is everything it does not cover. */
-      if (items.length === 1) span = TAU - current.span;
-      if (span > 1e-6) gaps.push({ start: norm(end), span: span });
+    /* Cut every interval at the 0/TAU seam so they are all plain segments. */
+    var segments = [];
+    for (var i = 0; i < blocked.length; i++) {
+      var span = Math.min(Math.max(blocked[i].span, 0), TAU);
+      if (span <= EPS) continue;
+      var start = norm(blocked[i].start);
+      var end = start + span;
+      if (end <= TAU) {
+        segments.push([start, end]);
+      } else {
+        segments.push([start, TAU]);
+        segments.push([0, end - TAU]);
+      }
     }
-    return gaps;
+    if (!segments.length) return [{ start: 0, span: TAU }];
+
+    segments.sort(function (a, b) { return a[0] - b[0]; });
+
+    var merged = [segments[0].slice()];
+    for (var j = 1; j < segments.length; j++) {
+      var last = merged[merged.length - 1];
+      if (segments[j][0] <= last[1] + EPS) {
+        if (segments[j][1] > last[1]) last[1] = segments[j][1];
+      } else {
+        merged.push(segments[j].slice());
+      }
+    }
+
+    var free = [];
+    var cursor = 0;
+    for (var k = 0; k < merged.length; k++) {
+      if (merged[k][0] - cursor > 1e-6) free.push([cursor, merged[k][0]]);
+      if (merged[k][1] > cursor) cursor = merged[k][1];
+    }
+    if (TAU - cursor > 1e-6) free.push([cursor, TAU]);
+
+    /* A free run touching both ends of the cut is really one wrapping run. */
+    if (free.length > 1 && free[0][0] <= EPS && free[free.length - 1][1] >= TAU - EPS) {
+      var head = free.shift();
+      var tail = free.pop();
+      free.push([tail[0], tail[1] + (head[1] - head[0])]);
+    }
+
+    return free.map(function (f) { return { start: norm(f[0]), span: f[1] - f[0] }; });
   }
 
   /* Intersect a free interval with an allowed band, both {start, span}. */

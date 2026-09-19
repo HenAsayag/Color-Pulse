@@ -8,7 +8,7 @@ Two layers: headless rule tests in Node, and browser checks driven through the
 
 ```
 node tests/rules.test.js
-→ 34 passed, 0 failed
+→ 36 passed, 0 failed
 ```
 
 | Group | Covered |
@@ -25,6 +25,7 @@ node tests/rules.test.js
 | Restart | score, lives, timer, direction, targets and pending spawns all reset; the same seed reproduces a run exactly and different seeds diverge |
 | Speed | ramps to the cap without exceeding it; largest single-frame change 0.063 rad/s, i.e. no visible stepping |
 | Consistency | a 4000-frame bot run ends with the score exactly equal to the sum of its awards |
+| Spacing | `freeIntervals` merges overlapping and wrapping blocked runs, and no free run overlaps a blocked one; across 12 seeded bot runs no two visible sectors ever overlap or come closer than the 26° minimum gap |
 
 ## Rendering
 
@@ -143,7 +144,17 @@ Captured from the running game and compared with the frame contact sheet:
    outermost ones past the viewport edge. The group is now clamped, and both
    renderers clamp again at draw time as a final guard. Verified with 12
    labels alive at once: all stayed within the playfield.
-9. **The Canvas 2D fallback could not get a context.** A canvas is bound to the
+9. **Sectors could spawn touching, with no dark gap between them.** To keep
+   spacing, each existing sector is padded by the minimum gap before free
+   space is computed — which makes neighbouring blocked intervals overlap.
+   `freeIntervals` assumed they were disjoint and walked them pairwise, so an
+   overlapping pair produced a phantom free run spanning other sectors, and a
+   replacement could be placed hard against a neighbour. Measured before the
+   fix: 91,947 violations in 1.3M pair checks, gaps down to 0°. After: zero
+   violations, zero overlaps, smallest gap exactly 26.0°. The spawn tests had
+   missed it because they ran against an empty ring. Spotted in a screenshot
+   of the deployed site.
+10. **The Canvas 2D fallback could not get a context.** A canvas is bound to the
    first context type it hands out, and the failed WebGL attempt had already
    taken it, so `getContext('2d')` returned `null` and every frame threw. The
    fallback now swaps in a fresh canvas element first.
