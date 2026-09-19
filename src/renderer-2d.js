@@ -226,11 +226,14 @@
     ctx.font = '700 ' + Math.round(l.labelFont) + 'px ' + Layout.FONT;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
+    var margin = 18;
     for (var i = 0; i < labels.length; i++) {
       var lb = labels[i];
       ctx.globalAlpha = lb.alpha;
       ctx.fillStyle = Color.css(lb.color);
-      ctx.fillText(lb.text, l.cx + lb.dx, l.labelY - lb.rise);
+      /* final guard: a label can never be drawn off the playfield */
+      var x = Math.max(margin, Math.min(l.W - margin, l.cx + lb.dx));
+      ctx.fillText(lb.text, x, l.labelY - lb.rise);
     }
     ctx.restore();
   };

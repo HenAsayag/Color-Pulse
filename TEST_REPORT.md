@@ -138,7 +138,12 @@ Captured from the running game and compared with the frame contact sheet:
 6. **`+1`/`+2` in the how-to were clipped by the scrollbar.**
 7. **`half` is a reserved word in GLSL**, so the ring shader failed to compile and
    every load silently fell back to Canvas 2D.
-8. **The Canvas 2D fallback could not get a context.** A canvas is bound to the
+8. **Floating labels could march off the screen.** Each simultaneous label took
+   a new lane 40px further out with no bound, so a fast streak pushed the
+   outermost ones past the viewport edge. The group is now clamped, and both
+   renderers clamp again at draw time as a final guard. Verified with 12
+   labels alive at once: all stayed within the playfield.
+9. **The Canvas 2D fallback could not get a context.** A canvas is bound to the
    first context type it hands out, and the failed WebGL attempt had already
    taken it, so `getContext('2d')` returned `null` and every frame threw. The
    fallback now swaps in a fresh canvas element first.

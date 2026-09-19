@@ -456,9 +456,12 @@
   RendererGL.prototype.drawLabels = function (fx) {
     var l = this.layout;
     var labels = fx.labelList();
+    var margin = 18;
     for (var i = 0; i < labels.length; i++) {
       var lb = labels[i];
-      this.drawText(lb.text, 'label', l.cx + lb.dx, l.labelY - lb.rise, lb.color, lb.alpha, 1);
+      /* final guard: a label can never be drawn off the playfield */
+      var x = Math.max(margin, Math.min(l.W - margin, l.cx + lb.dx));
+      this.drawText(lb.text, 'label', x, l.labelY - lb.rise, lb.color, lb.alpha, 1);
     }
   };
 

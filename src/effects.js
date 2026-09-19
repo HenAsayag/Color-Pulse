@@ -76,6 +76,14 @@
     var x = visible.length ? maxX + cfg.gapPx : 0;
     this.labels.push({ text: text, color: color, age: 0, duration: cfg.durationMs, x: x });
     if (this.labels.length > this.fxConfig().maxEvents) this.labels.shift();
+
+    /* A fast streak can put several labels up at once. Bound the group so it
+     * always stays inside the playfield: past the cap the outermost lanes are
+     * shared rather than marching off the edge of the screen. */
+    var maxOffset = cfg.gapPx * 1.5;
+    this.labels.forEach(function (l) {
+      l.x = Math.max(-maxOffset, Math.min(maxOffset, l.x));
+    });
   };
 
   Effects.prototype.shake = function () {
