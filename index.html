@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#080909">
+<meta name="description" content="COLOR PULSE — a minimalist circular timing game.">
+<title>COLOR PULSE</title>
+<link rel="icon" href="assets/svg/heart-full.svg">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div id="app">
+  <canvas id="playfield" aria-label="Game playfield. Press space to strike the marker."></canvas>
+
+  <!-- Gameplay controls. .no-strike keeps them from also hitting the ring. -->
+  <div id="hud-controls" class="no-strike">
+    <button id="btn-fullscreen" class="icon-btn" type="button" aria-label="Enter full screen" aria-pressed="false" hidden>
+      <img id="fullscreen-icon" src="assets/svg/icon-fullscreen.svg" alt="" width="24" height="24">
+    </button>
+    <button id="btn-pause" class="icon-btn" type="button" aria-label="Pause">
+      <img src="assets/svg/icon-pause.svg" alt="" width="24" height="24">
+    </button>
+    <button id="btn-mute" class="icon-btn" type="button" aria-label="Mute sound" aria-pressed="false">
+      <img id="mute-icon" src="assets/svg/icon-sound.svg" alt="" width="24" height="24">
+    </button>
+  </div>
+
+  <button id="tap-button" class="no-strike" type="button">TAP</button>
+
+  <div id="countdown-overlay" aria-hidden="true"><span id="countdown-value"></span></div>
+
+  <div id="practice-banner" class="no-strike" hidden>
+    <p id="practice-text"></p>
+    <button id="practice-exit" class="text-btn" type="button">End practice</button>
+  </div>
+
+  <!-- ------------------------------ screens ------------------------------ -->
+
+  <section id="screen-loading" class="screen is-visible" aria-label="Loading">
+    <div class="panel">
+      <p class="loading-text">Loading…</p>
+    </div>
+  </section>
+
+  <section id="screen-menu" class="screen" hidden aria-label="Main menu">
+    <div class="panel">
+      <h1 class="title">COLOR<span>PULSE</span></h1>
+      <p class="tagline">Strike the colour under the marker.</p>
+
+      <div class="best-line">Best <strong id="menu-best">0</strong></div>
+
+      <div class="actions">
+        <button id="btn-play" class="primary-btn" type="button">Play</button>
+        <button id="btn-howto" class="secondary-btn" type="button">How to play</button>
+        <button id="btn-practice" class="secondary-btn" type="button">Practice</button>
+      </div>
+
+      <fieldset class="settings">
+        <legend>Settings</legend>
+        <label class="switch">
+          <input type="checkbox" id="opt-sound" checked>
+          <span>Sound</span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="opt-reduced-motion">
+          <span>Reduced motion</span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="opt-reduced-flash">
+          <span>Reduced flashing</span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="opt-decorative-timer">
+          <span>Inner ring decorative only</span>
+        </label>
+      </fieldset>
+
+      <p class="credit">Created by Hen Asayag</p>
+    </div>
+  </section>
+
+  <section id="screen-howto" class="screen" hidden aria-label="How to play">
+    <div class="panel panel-scroll">
+      <h2>How to play</h2>
+      <p class="howto-lead">
+        The thin white marker at twelve o&rsquo;clock never moves. The ring of colours
+        turns underneath it. Press once — tap the playfield, click, or use
+        <kbd>Space</kbd> — at the moment a colour is under the marker.
+      </p>
+
+      <ul class="score-key">
+        <li><span class="chip" style="--chip:#FFDA00"></span> Yellow <b>+1</b></li>
+        <li><span class="chip" style="--chip:#2467F5"></span> Blue <b>+2</b></li>
+        <li><span class="chip chip-narrow" style="--chip:#19D538"></span> Green <b>+5</b> <em>narrow, hardest</em></li>
+        <li><span class="chip" style="--chip:#F56B08"></span> Orange <b>+3</b> <em>and restores a heart</em></li>
+      </ul>
+
+      <p><b>Every press reverses the ring.</b> Each time you strike, the colours
+      start turning the other way — so the next target comes at you from the
+      opposite side.</p>
+
+      <p>Pressing over a dark gap costs a heart. So does letting the inner ring
+      run all the way down — you have <b id="howto-timer">6</b> seconds to land each strike.
+      Three hearts, and the run ends when the last one goes.</p>
+
+      <p class="note">
+        Scoring values, the timer, spawn rates and the menus are reconstruction
+        defaults chosen for this build, not rules recovered from the original game.
+      </p>
+
+      <div class="actions">
+        <button id="btn-howto-practice" class="primary-btn" type="button">Try practice</button>
+        <button id="btn-howto-back" class="secondary-btn" type="button">Back</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-paused" class="screen" hidden aria-label="Paused">
+    <div class="panel">
+      <h2>Paused</h2>
+      <div class="actions">
+        <button id="btn-resume" class="primary-btn" type="button">Resume</button>
+        <button id="btn-restart-paused" class="secondary-btn" type="button">Restart</button>
+        <button id="btn-mute-paused" class="secondary-btn" type="button">Sound: on</button>
+        <button id="btn-menu-paused" class="secondary-btn" type="button">Main menu</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="screen-gameover" class="screen" hidden aria-label="Game over">
+    <div class="panel">
+      <h2>Run over</h2>
+      <p class="final-score" id="final-score">0</p>
+      <p class="best-line">Best <strong id="gameover-best">0</strong></p>
+      <p class="new-best" id="new-best" hidden>New best</p>
+      <dl class="run-stats">
+        <div><dt>Hits</dt><dd id="stat-hits">0</dd></div>
+        <div><dt>Missed</dt><dd id="stat-misses">0</dd></div>
+        <div><dt>Timed out</dt><dd id="stat-timeouts">0</dd></div>
+        <div><dt>Hearts</dt><dd id="stat-hearts">0</dd></div>
+      </dl>
+      <div class="actions">
+        <button id="btn-restart" class="primary-btn" type="button">Play again</button>
+        <button id="btn-menu" class="secondary-btn" type="button">Main menu</button>
+      </div>
+    </div>
+  </section>
+</div>
+
+<p id="live-region" class="sr-only" aria-live="polite" role="status"></p>
+
+<script src="src/config.js"></script>
+<script src="src/rng.js"></script>
+<script src="src/geometry.js"></script>
+<script src="src/ring.js"></script>
+<script src="src/game.js"></script>
+<script src="src/assets.js"></script>
+<script src="src/color.js"></script>
+<script src="src/layout.js"></script>
+<script src="src/effects.js"></script>
+<script src="src/gl.js"></script>
+<script src="src/renderer-gl.js"></script>
+<script src="src/renderer-2d.js"></script>
+<script src="src/audio.js"></script>
+<script src="src/ui.js"></script>
+<script src="src/input.js"></script>
+<script src="src/main.js"></script>
+</body>
+</html>
