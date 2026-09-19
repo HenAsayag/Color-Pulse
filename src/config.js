@@ -62,10 +62,10 @@
     /* Sector archetypes. spanDeg/points are kit defaults; only the existence of
      * yellow / blue / small green / occasional orange segments is observed. */
     sectors: [
-      { id: 'yellow', color: '#FFDA00', spanDeg: 65, spanJitterDeg: 10, points: 1, heals: 0 },
-      { id: 'blue',   color: '#2467F5', spanDeg: 48, spanJitterDeg: 8,  points: 2, heals: 0 },
-      { id: 'green',  color: '#19D538', spanDeg: 14, spanJitterDeg: 3,  points: 5, heals: 0 },
-      { id: 'orange', color: '#F56B08', spanDeg: 23, spanJitterDeg: 4,  points: 3, heals: 1 }
+      { id: 'yellow', color: '#FFDA00', spanDeg: 62, spanJitterDeg: 18, points: 1, heals: 0 },
+      { id: 'blue',   color: '#2467F5', spanDeg: 46, spanJitterDeg: 14, points: 2, heals: 0 },
+      { id: 'green',  color: '#19D538', spanDeg: 15, spanJitterDeg: 5,  points: 5, heals: 0 },
+      { id: 'orange', color: '#F56B08', spanDeg: 24, spanJitterDeg: 6,  points: 3, heals: 1 }
     ],
 
     rules: {
@@ -76,19 +76,22 @@
       timeoutCosts: 1,
       timerSeconds: 6,
       timerMode: 'countdown',    /* 'countdown' | 'decorative' (see ASSUMPTIONS.md) */
-      speedStartRadPerSec: 2.8,
-      speedMaxRadPerSec: 5.2,
-      speedPerPoint: 0.012,
-      speedRampMs: 600,          /* easing window so speed never steps visibly */
+      speedStartRadPerSec: 4.0,
+      speedMaxRadPerSec: 6.8,
+      speedPerPoint: 0.02,
+      speedRampMs: 450,          /* easing window so speed never steps visibly */
       heartSpawnChancePerSuccess: 0.18,
       baseSectorCount: 3,        /* one yellow, one blue, one green kept alive */
       minGapDeg: 26,             /* minimum dark gap between two sectors */
-      spawnLeadDeg: 70,          /* new sector must be this far before the marker */
+      spawnLeadDeg: 70,          /* minimum lead; scaled up with speed below */
+      spawnGraceMs: 250,         /* live time a new sector must have before the marker */
       spawnClearDeg: 10,         /* new sector may not straddle the marker */
       spawnMs: 130,              /* fade/scale in; collision OFF until complete */
       despawnMs: 130,            /* fade/scale out; collision OFF immediately */
       inputCooldownMs: 110,      /* swallows duplicated pointer/key events only */
       reverseOnPress: true,      /* every press flips the direction of rotation */
+      resizeOnPress: true,       /* every press re-rolls every sector width */
+      minSpanDeg: 6,             /* floor when widths are squeezed by neighbours */
       countdownSeconds: 3,
       innerRotateRadPerSec: 0.55,  /* slow drift of the inner arc gap */
       innerGapDeg: 42,             /* matches inner-ring-*.svg */

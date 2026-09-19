@@ -29,6 +29,7 @@
     this.sectors = [];
     this.pending = [];
     this.direction = 1;   /* +1 clockwise, -1 anticlockwise; set by the Game */
+    this.speed = config.rules.speedStartRadPerSec;  /* kept in step by the Game */
     this.archetypes = {};
     var self = this;
     config.sectors.forEach(function (s) { self.archetypes[s.id] = s; });
@@ -206,19 +207,21 @@
      * so the band mirrors when the direction flips.
      *
      *   clockwise (+1): A grows; the far edge A+span reaches the marker
-     *     A >= clear            not sitting on the marker
-     *     A + span <= TAU-lead  arrives with `lead` of travel still to go
-     *
      *   anticlockwise (-1): A shrinks; A itself reaches the marker
-     *     A >= lead             arrives with `lead` of travel still to go
-     *     A + span <= TAU-clear not sitting on the marker */
+     *
+     * The TRAILING side needs a margin too, not just `clear`. Every press
+     * reverses the ring, and a press can land while this sector is still
+     * fading in — at which point the trailing edge becomes the leading one.
+     * Without the floor, a sector placed just past the marker would swing
+     * straight back onto it and turn collidable right there. */
+    var behind = Math.max(clear, this.minLead());
     var lo, hi;
     if (this.direction >= 0) {
-      lo = clear;
+      lo = behind;
       hi = TAU - leadRad - span;
     } else {
       lo = leadRad;
-      hi = TAU - clear - span;
+      hi = TAU - behind - span;
     }
     if (hi <= lo) return null;
 
@@ -258,20 +261,101 @@
     return null;
   };
 
-  Ring.prototype.spawn = function (type, ringAngle) {
+  /* How much travel a new sector needs before it reaches the marker.
+   *
+   * A fixed angle is wrong: the ring speeds up as the score climbs, so the
+   * same 70 degrees buys less and less time, and at the top speed a sector
+   * would still be fading in — uncollidable — as it passed the marker. The
+   * lead is therefore measured in TIME and converted with the current speed:
+   * long enough to finish fading in, plus a grace period where it is live and
+   * visible before it can be struck.
+   */
+  Ring.prototype.leadFor = function () {
     var rules = this.rules();
-    var span = this.spanFor(type);
-    var lead = G.degToRad(rules.spawnLeadDeg);
+    var speed = Math.max(0.1, this.speed || rules.speedStartRadPerSec);
+    var byTime = speed * (rules.spawnMs + rules.spawnGraceMs) / 1000;
+    return Math.max(G.degToRad(rules.spawnLeadDeg), byTime);
+  };
 
-    /* Prefer a comfortable lead; accept a shorter one before giving up, but
-     * never below a quarter turn of warning. */
-    var absStart = this.findPlacement(span, ringAngle, lead);
-    if (absStart === null) absStart = this.findPlacement(span, ringAngle, lead * 0.5);
-    if (absStart === null) absStart = this.findPlacement(span, ringAngle, Math.PI / 2);
+  /* The absolute floor: a sector must at minimum be fully faded in, with
+   * margin, before it can arrive. Never place one closer than this. */
+  Ring.prototype.minLead = function () {
+    var rules = this.rules();
+    var speed = Math.max(0.1, this.speed || rules.speedStartRadPerSec);
+    return speed * (rules.spawnMs * 1.8) / 1000;
+  };
+
+  Ring.prototype.spawn = function (type, ringAngle) {
+    var span = this.spanFor(type);
+    var preferred = this.leadFor();
+    var floor = this.minLead();
+
+    /* Prefer a comfortable lead, accept a tighter one when the ring is busy,
+     * but never go below the fade-in floor: the caller retries next frame
+     * instead of producing a target that pops in on top of the marker. */
+    var absStart = this.findPlacement(span, ringAngle, preferred);
+    if (absStart === null) {
+      absStart = this.findPlacement(span, ringAngle, Math.max(floor, preferred * 0.7));
+    }
+    if (absStart === null) absStart = this.findPlacement(span, ringAngle, floor);
     if (absStart === null) return false;
 
     this.sectors.push(this.make(type, absStart - ringAngle, span, 'in'));
     return true;
+  };
+
+  /* Re-roll every visible sector's width, keeping each one centred where it
+   * already is so the ring reshapes in place rather than jumping.
+   *
+   * Widths are relaxed against their neighbours afterwards: two sectors whose
+   * new widths would close the dark gap between them are scaled back together
+   * until the minimum gap holds again. Centres never move, so this cannot
+   * push a sector onto the marker or reorder the ring.
+   */
+  Ring.prototype.resizeAll = function (ringAngle) {
+    var rules = this.rules();
+    var minGap = G.degToRad(rules.minGapDeg);
+    var minSpan = G.degToRad(rules.minSpanDeg);
+    var self = this;
+
+    var items = this.sectors
+      .filter(function (s) { return s.phase !== 'out'; })
+      .map(function (s) {
+        return {
+          sector: s,
+          center: G.norm(ringAngle + s.start + s.span / 2),
+          span: self.spanFor(s.id)
+        };
+      });
+    if (!items.length) return;
+
+    if (items.length === 1) {
+      items[0].span = Math.min(items[0].span, TAU - 2 * minGap);
+    } else {
+      items.sort(function (a, b) { return a.center - b.center; });
+      for (var pass = 0; pass < 10; pass++) {
+        var changed = false;
+        for (var i = 0; i < items.length; i++) {
+          var a = items[i];
+          var b = items[(i + 1) % items.length];
+          var between = G.cwDelta(a.center, b.center);
+          var halves = a.span / 2 + b.span / 2;
+          if (halves + minGap > between + 1e-9) {
+            var room = Math.max(0, between - minGap);
+            var scale = halves > 1e-9 ? room / halves : 0;
+            a.span = Math.max(minSpan, a.span * scale);
+            b.span = Math.max(minSpan, b.span * scale);
+            changed = true;
+          }
+        }
+        if (!changed) break;
+      }
+    }
+
+    items.forEach(function (it) {
+      it.sector.span = it.span;
+      it.sector.start = G.norm(it.center - it.span / 2 - ringAngle);
+    });
   };
 
   /* Render-facing snapshot: absolute angles plus transition progress. */

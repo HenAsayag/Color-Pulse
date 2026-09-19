@@ -8,7 +8,7 @@ Two layers: headless rule tests in Node, and browser checks driven through the
 
 ```
 node tests/rules.test.js
-→ 36 passed, 0 failed
+→ 40 passed, 0 failed
 ```
 
 | Group | Covered |
@@ -19,6 +19,9 @@ node tests/rules.test.js
 | Scoring | each colour awards its configured points; one press gives exactly one outcome and a duplicate is swallowed; a single pass cannot be farmed; a gap press costs one heart and no score |
 | Hearts | the cap holds; orange still scores at full health; exactly one heart is restored when one is missing; never more than one orange alive |
 | Direction | every press flips the direction, ring and game stay in step, and travel actually reverses |
+| Widths | every press re-rolls every sector width (20/20 presses); a width may be squeezed below its colour range by a neighbour but never inflated above it |
+| Spawn timing | across 10 seeded runs, no sector still fading in ever sits on the marker, including across the reversals a press causes |
+| Config |  is merged OVER the code defaults when served, so a drift test fails the suite if the two disagree on any rule or sector width |
 | Timer | expiry costs one heart and restarts the interval; one long frame cannot charge two timeouts; a hit resets the interval; decorative mode never charges one |
 | Pause / hidden | pausing freezes timer, angle and clock; presses are ignored while paused; resuming re-enters the countdown with input dead; a 30-second suspension cannot bank penalties |
 | Game over | fires exactly once at zero lives; no press registers afterwards; practice never ends a run or spends a heart |
@@ -154,7 +157,24 @@ Captured from the running game and compared with the frame contact sheet:
    violations, zero overlaps, smallest gap exactly 26.0°. The spawn tests had
    missed it because they ran against an empty ring. Spotted in a screenshot
    of the deployed site.
-10. **The Canvas 2D fallback could not get a context.** A canvas is bound to the
+10. **The faster ring made new targets unhittable.** The spawn lead was a fixed
+    70°, which at 2.8 rad/s bought 436 ms but at the new 6.8 rad/s only 180 ms —
+    less than the 130 ms fade-in plus any margin, so a replacement could turn
+    collidable essentially on the marker. The lead is now measured in time and
+    converted with the current speed.
+11. **A reversal could strand a sector fading in on the marker.** Placement only
+    guaranteed clearance on the leading side, but a press reverses the ring, and
+    a press can land while a sector is still fading in — turning its trailing
+    edge into the leading one. Measured: 14 occurrences across 30 seeded runs.
+    Placement now requires clearance on both sides; after the fix, 0.
+12. **The speed increase never reached the served game.**
+     is fetched and merged over the code defaults, and
+    it still held the old 2.8–5.2 rad/s, so the browser silently ran at the old
+    speed while the source said otherwise. Caught by checking the live value
+    rather than trusting the edit. The JSON is now generated from the code
+    defaults, and a test fails the suite if they ever drift apart — verified by
+    reintroducing the stale value and watching it fail.
+13. **The Canvas 2D fallback could not get a context.** A canvas is bound to the
    first context type it hands out, and the failed WebGL attempt had already
    taken it, so `getContext('2d')` returned `null` and every frame threw. The
    fallback now swaps in a fresh canvas element first.

@@ -372,6 +372,72 @@ test('only one orange collectible exists at a time', () => {
   }
 });
 
+test('every press re-rolls the sector widths', () => {
+  const game = startPlaying(newGame());
+  let pressesThatChanged = 0;
+  const total = 20;
+  for (let i = 0; i < total; i++) {
+    game.lives = 3;
+    const before = new Map(game.ring.sectors.filter(s => s.phase !== 'out').map(s => [s.uid, s.span]));
+    game.lastPressAt = -Infinity;
+    game.press(game.lastNowCursor);
+    const after = game.ring.sectors.filter(s => s.phase !== 'out');
+    const changed = after.some(s => before.has(s.uid) && Math.abs(before.get(s.uid) - s.span) > 1e-9);
+    if (changed) pressesThatChanged++;
+    run(game, 120);
+  }
+  assert.strictEqual(pressesThatChanged, total,
+    'only ' + pressesThatChanged + '/' + total + ' presses changed a width');
+});
+
+test('resizing keeps every width inside its colour range', () => {
+  const config = freshConfig();
+  const game = startPlaying(newGame());
+  const byId = {};
+  config.sectors.forEach(a => { byId[a.id] = a; });
+  for (let i = 0; i < 60; i++) {
+    game.lives = 3;
+    game.lastPressAt = -Infinity;
+    game.press(game.lastNowCursor);
+    run(game, 100);
+    game.ring.sectors.filter(s => s.phase !== 'out').forEach(s => {
+      const arch = byId[s.id];
+      const maxDeg = arch.spanDeg + (arch.spanJitterDeg || 0);
+      /* Widths may be squeezed DOWN by a neighbour, never inflated. */
+      assert.ok(G.radToDeg(s.span) <= maxDeg + 1e-6,
+        s.id + ' grew to ' + G.radToDeg(s.span).toFixed(1) + ' deg, above its ' + maxDeg);
+      assert.ok(G.radToDeg(s.span) >= config.rules.minSpanDeg - 1e-6,
+        s.id + ' shrank below the floor');
+    });
+  }
+});
+
+test('a fading-in sector never sits on the marker, even across a reversal', () => {
+  /* A press reverses the ring, so a sector still fading in can have its
+   * trailing edge become the leading one. Placement must leave room on both
+   * sides or a target turns collidable right on the marker. */
+  let onMarker = 0;
+  let samples = 0;
+  for (let seed = 1; seed <= 10; seed++) {
+    const game = startPlaying(newGame({}, seed), seed);
+    while (game.state === 'playing' && game.lastNowCursor < 20000) {
+      run(game, 16);
+      if (game.ring.hitTest(game.ringAngle)) {
+        game.lastPressAt = -Infinity;
+        game.press(game.lastNowCursor);
+      }
+      game.ring.sectors.forEach(s => {
+        if (s.phase !== 'in') return;
+        samples++;
+        const abs = G.norm(game.ringAngle + s.start);
+        if (G.arcContains(abs, s.span, 0)) onMarker++;
+      });
+    }
+  }
+  assert.ok(samples > 500, 'not enough fading-in samples: ' + samples);
+  assert.strictEqual(onMarker, 0, onMarker + ' fading-in sectors were on the marker');
+});
+
 test('every press flips the direction of rotation', () => {
   const game = startPlaying(newGame());
   const seen = [game.direction];
@@ -586,7 +652,13 @@ test('speed ramps smoothly and respects the cap', () => {
   }
   assert.ok(game.speed <= rules.speedMaxRadPerSec + 1e-9, 'speed passed the cap');
   assert.ok(game.speed > rules.speedMaxRadPerSec - 0.02, 'speed never reached the cap');
-  assert.ok(biggestStep < 0.09, 'speed stepped by ' + biggestStep.toFixed(3) + ' in one frame');
+  /* Expressed against the configured range so the bound stays meaningful if
+   * the speeds are retuned: one frame may never cover more than 5% of the
+   * whole start-to-cap ramp, which is far below what reads as a jump. */
+  const range = rules.speedMaxRadPerSec - rules.speedStartRadPerSec;
+  assert.ok(biggestStep < range * 0.05,
+    'speed stepped by ' + biggestStep.toFixed(3) + ' in one frame (' +
+    (100 * biggestStep / range).toFixed(1) + '% of the ramp)');
 });
 
 test('a full bot run stays consistent: score matches the awards', () => {
@@ -604,6 +676,31 @@ test('a full bot run stays consistent: score matches the awards', () => {
   }
   assert.strictEqual(game.score, expected, 'score drifted from the sum of awards');
   assert.ok(game.score > 100, 'the bot barely scored: ' + game.score);
+});
+
+section('Configuration');
+
+test('config/game-config.json does not contradict the code defaults', () => {
+  /* The JSON is fetched and merged OVER src/config.js when the game is
+   * served, so a stale value here silently changes the shipped game. */
+  const json = JSON.parse(require('fs').readFileSync(__dirname + '/../config/game-config.json', 'utf8'));
+  const drift = [];
+  Object.keys(json.rules || {}).forEach(key => {
+    if (CONFIG.rules[key] === undefined) return;
+    if (json.rules[key] !== CONFIG.rules[key]) {
+      drift.push(key + ': json=' + json.rules[key] + ' code=' + CONFIG.rules[key]);
+    }
+  });
+  (json.sectors || []).forEach(entry => {
+    const arch = CONFIG.sectors.filter(s => s.id === entry.id)[0];
+    if (!arch) return;
+    ['spanDeg', 'spanJitterDeg', 'points'].forEach(f => {
+      if (entry[f] !== undefined && entry[f] !== arch[f]) {
+        drift.push(entry.id + '.' + f + ': json=' + entry[f] + ' code=' + arch[f]);
+      }
+    });
+  });
+  assert.strictEqual(drift.length, 0, 'config drift: ' + drift.join('; '));
 });
 
 /* ---------------------------------------------------------------- done --- */

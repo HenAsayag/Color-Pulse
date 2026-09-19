@@ -2,7 +2,7 @@
   "metadata": {
     "status": "Proposed tunable defaults, not recovered original source values. reverseOnPress was specified by the user, not derived from the clip.",
     "referenceSeconds": 10.667,
-    "note": "Mirrors src/config.js. Fetched and merged over the built-in defaults when the game is served over http(s)."
+    "note": "Mirrors src/config.js and is merged OVER it when the game is served over http(s). Keep both in step: a stale value here silently overrides the code."
   },
   "palette": {
     "background": "#080909",
@@ -27,29 +27,31 @@
     "innerRadius": 170,
     "innerWidth": 12,
     "markerAngleDegrees": 0,
-    "angles": "0 is top; positive clockwise; radians internally",
-    "innerRotateRadPerSec": 0.55,
-    "innerGapDeg": 42
+    "angles": "0 is top; positive clockwise; radians internally"
   },
   "sectors": [
     {
       "id": "yellow",
-      "spanDeg": 65,
+      "spanDeg": 62,
+      "spanJitterDeg": 18,
       "points": 1
     },
     {
       "id": "blue",
-      "spanDeg": 48,
+      "spanDeg": 46,
+      "spanJitterDeg": 14,
       "points": 2
     },
     {
       "id": "green",
-      "spanDeg": 14,
+      "spanDeg": 15,
+      "spanJitterDeg": 5,
       "points": 5
     },
     {
       "id": "orange",
-      "spanDeg": 23,
+      "spanDeg": 24,
+      "spanJitterDeg": 6,
       "points": 3,
       "heals": 1
     }
@@ -62,14 +64,14 @@
     "oneRewardPerPress": true,
     "repeatedTapSamePass": false,
     "timerSeconds": 6,
-    "speedStartRadPerSec": 2.8,
-    "speedMaxRadPerSec": 5.2,
-    "speedPerPoint": 0.012,
+    "speedStartRadPerSec": 4,
+    "speedMaxRadPerSec": 6.8,
+    "speedPerPoint": 0.02,
     "heartSpawnChancePerSuccess": 0.18,
     "missScorePenalty": 0,
     "timeoutCosts": 1,
     "timerMode": "countdown",
-    "speedRampMs": 600,
+    "speedRampMs": 450,
     "baseSectorCount": 3,
     "minGapDeg": 26,
     "spawnLeadDeg": 70,
@@ -79,7 +81,12 @@
     "inputCooldownMs": 110,
     "reverseOnPress": true,
     "countdownSeconds": 3,
-    "seed": 0
+    "seed": 0,
+    "spawnGraceMs": 250,
+    "resizeOnPress": true,
+    "minSpanDeg": 6,
+    "innerRotateRadPerSec": 0.55,
+    "innerGapDeg": 42
   },
   "effects": {
     "success": {

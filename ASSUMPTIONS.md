@@ -32,9 +32,14 @@ belong to the video player rather than the game).
 
 ## Supplied by the user
 
-- **Every press reverses the direction of rotation.** This was not derivable
-  from the clip; it was specified directly during development and is implemented
-  as the default (`rules.reverseOnPress`).
+- **Every press reverses the direction of rotation.** Not derivable from the
+  clip; specified directly during development and implemented as the default
+  (`rules.reverseOnPress`).
+- **Every press re-rolls the width of every colour.** Also specified directly.
+  Each sector keeps its centre and takes a new width from its own range, so the
+  ring reshapes in place rather than jumping (`rules.resizeOnPress`).
+- **The game should be faster.** Rotation was raised from 2.8–5.2 rad/s to
+  4.0–6.8 rad/s, and the ramp now reaches the cap at 140 points instead of 200.
 
 ## Reconstruction defaults
 
@@ -49,8 +54,8 @@ Each of these is a design decision, configurable in `src/config.js`.
 | Gap press | costs one heart | Consistent with the red flash and heart loss, but the cause is not visible. |
 | Inner arc | a 6-second countdown per strike, reset on every resolved press | The clip shows a thin arc with a moving gap changing colour. A timer is a plausible reading, **not** an established one. `rules.timerMode: 'decorative'` (a menu setting) switches it to pure motion if this reading is wrong. |
 | Timeout | costs one heart, once, then restarts the interval | Never observed. |
-| Speed | 2.8 rad/s, +0.012 per point, capped at 5.2 | Estimated from the clip, which sits near the cap at scores of 208–239. Eased over 600 ms so it never steps. |
-| Sector widths | yellow 65°, blue 48°, green 14°, orange 23°, jittered | Kit values, close to the frames. |
+| Speed | 4.0 rad/s, +0.02 per point, capped at 6.8 | Raised at the user request above. The original estimate from the clip was 2.8–5.2; the clip sits near its cap at scores of 208–239. Eased over 450 ms so it never steps. |
+| Sector widths | yellow 62°, blue 46°, green 15°, orange 24°, re-rolled each press within ±18/±14/±5/±6° | Centred on the kit values. The jitter was widened so the per-press resize reads clearly on screen. A width may be squeezed below its range by a neighbour, never above it. |
 | Minimum gap | 26° | Chosen so every target stays reachable. |
 | Orange spawn | 18% per successful hit, never more than one alive | Balancing assumption. |
 | Starting state | score 0, three hearts | The clip's 208 is mid-run. |
@@ -74,9 +79,11 @@ they are decisions rather than physics:
 - **Collision is off during transitions.** A sector fading in cannot be struck,
   and a struck sector stops being judgeable immediately. Nothing invisible is
   ever judged.
-- **New sectors are always reachable.** A replacement is never placed on the
-  marker and never closer than `spawnClearDeg` of travel to it, measured in the
-  direction the ring is currently turning — which flips with every press.
+- **New sectors are always reachable.** The lead a replacement needs is measured
+  in TIME, not degrees, and converted with the current speed — a fixed angle
+  buys less and less warning as the ring accelerates. It must also clear the
+  marker on BOTH sides, because a press can reverse the ring while the sector
+  is still fading in, turning its trailing edge into the leading one.
 - **The struck sector is consumed**, so a single pass cannot be farmed.
 - **A duplicated input inside 110 ms is swallowed.** This absorbs a
   pointer/click pair or a stray repeat; it is short enough not to block real

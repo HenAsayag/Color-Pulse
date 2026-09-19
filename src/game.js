@@ -144,6 +144,7 @@
     /* Exponential ease so a score jump never steps the rotation visibly. */
     var k = rules.speedRampMs > 0 ? 1 - Math.exp(-dt / rules.speedRampMs) : 1;
     this.speed += (target - this.speed) * k;
+    this.ring.speed = this.speed;
     this.ringAngle = G.norm(this.ringAngle + this.direction * this.speed * dt / 1000);
     this.ring.update(dt, this.ringAngle);
   };
@@ -171,7 +172,10 @@
      * NEW direction, or they would spawn behind the marker. */
     var sector = this.ring.hitTest(this.ringAngle);
     if (this.rules().reverseOnPress) this.reverse();
-    return sector ? this.award(sector) : this.fail('gap');
+    var result = sector ? this.award(sector) : this.fail('gap');
+    /* Reshape last, so the replacement spawned by award() is included. */
+    if (this.rules().resizeOnPress) this.ring.resizeAll(this.ringAngle);
+    return result;
   };
 
   /* Every press flips which way the ring turns. Only the sign changes; the

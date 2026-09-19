@@ -2,7 +2,8 @@
 
 A minimalist circular timing game. The white marker at twelve o'clock never
 moves; the ring of colours turns underneath it. Press once when a colour is
-under the marker. **Every press reverses the direction of rotation.**
+under the marker. **Every press reverses the direction of rotation and re-rolls
+the width of every colour**, so the ring never looks the same twice.
 
 Built from the supplied Color Smash asset kit and reference clip.
 Created by Hen Asayag.
@@ -48,6 +49,11 @@ host refuses the request, rather than leaving a dead control on screen.
 
 Striking a dark gap costs a heart. So does letting the inner countdown ring run
 out — six seconds per strike. Three hearts; the run ends when the last one goes.
+
+The ring starts at 4.0 rad/s (about 0.64 turns a second) and accelerates with
+your score to a cap of 6.8 rad/s (about 1.08 turns a second), reached at 140
+points. At the cap a yellow sector is under the marker for roughly 160 ms and a
+green one for under 40 ms.
 
 **These values are reconstruction defaults, not rules recovered from the
 original game.** See [ASSUMPTIONS.md](ASSUMPTIONS.md) for what the reference
@@ -115,9 +121,13 @@ one place, `geometry.toCanvasAngle()`. Collision never reads a rendering value.
 
 Everything lives in `src/config.js`. When the game is served over http, the
 values in `config/game-config.json` are fetched and merged over them, so the
-game can be retuned without touching code. Useful knobs:
+game can be retuned without touching code. **The two files must agree** — a
+stale value in the JSON silently overrides the code, so `tests/rules.test.js`
+fails if they drift apart. Useful knobs:
 
 - `rules.reverseOnPress` — set `false` for continuous one-way rotation
+- `rules.resizeOnPress` — set `false` to keep sector widths fixed for a run
+- `sectors[].spanJitterDeg` — how much a width can swing on each press
 - `rules.timerMode` — `'countdown'` or `'decorative'` (also a menu setting)
 - `rules.seed` — set non-zero to make every run use the same layout
 - `rules.speedStartRadPerSec` / `speedMaxRadPerSec` / `speedPerPoint`
